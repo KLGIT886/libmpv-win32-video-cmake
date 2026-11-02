@@ -9,7 +9,8 @@ ExternalProject_Add(fontconfig
     UPDATE_COMMAND ""
     GIT_REMOTE_NAME origin
     GIT_TAG main
-    GIT_CLONE_FLAGS "--filter=tree:0"
+    # 该包用 `git am --3way` 打补丁，需要完整历史才能构造 fake ancestor；
+    # --filter=tree:0 的冷缓存下会报 "could not build fake ancestor"
     PATCH_COMMAND ${EXEC} git am --3way ${CMAKE_CURRENT_SOURCE_DIR}/fontconfig-*.patch
     CONFIGURE_COMMAND ""
     COMMAND ${EXEC} sed -i "s/both_libraries/library/g" <SOURCE_DIR>/src/meson.build
