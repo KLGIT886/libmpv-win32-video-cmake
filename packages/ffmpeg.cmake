@@ -27,6 +27,7 @@ ExternalProject_Add(ffmpeg
         libplacebo
         dav1d
         openal-soft
+        uavs3d
     GIT_REPOSITORY https://github.com/FFmpeg/FFmpeg.git
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--sparse --filter=tree:0"
@@ -73,7 +74,8 @@ ExternalProject_Add(ffmpeg
         --disable-vdpau
         --disable-bzlib
         --disable-libmfx
-        --disable-libuavs3d
+        # uavs3d：AVS3 解码（8K 直播必需），COMPILE_10BIT=ON 见 packages/uavs3d.cmake
+        --enable-libuavs3d
         --disable-linux-perf
         --disable-videotoolbox
         --disable-audiotoolbox
@@ -131,6 +133,8 @@ ExternalProject_Add(ffmpeg
         --enable-decoder=hevc*
         --enable-decoder=av1*
         --enable-decoder=libdav1d
+        # AVS3（8K/AVS3-P2 10bit）解码，由 uavs3d 提供
+        --enable-decoder=libuavs3d
         --enable-decoder=theora
         --enable-decoder=msmpeg*
         --enable-decoder=mjpeg*
@@ -251,6 +255,8 @@ ExternalProject_Add(ffmpeg
         --enable-parser=mpeg4
         --enable-parser=mpeg4video
         --enable-parser=mpegvideo
+        # AVS3 帧边界解析（mpegts 中的 8K AVS3 流必需）
+        --enable-parser=avs3
 
         --enable-parser=aac*
         --enable-parser=ac3
@@ -264,6 +270,13 @@ ExternalProject_Add(ffmpeg
 
         --enable-filter=overlay
         --enable-filter=equalizer
+        # 去交错：mpv 的 deinterlace=yes 走 bwdif，vf 里另用 yadif/w3fdif；
+        # scale/format 供 mpv 的 lavfi 桥自动插入格式转换节点
+        --enable-filter=bwdif
+        --enable-filter=yadif
+        --enable-filter=w3fdif
+        --enable-filter=scale
+        --enable-filter=format
 
         --enable-protocol=async
         --enable-protocol=cache
