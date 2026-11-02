@@ -181,7 +181,7 @@ jobs:
 
       - name: Saving repository cache
         uses: actions/cache/save@main
-        if: ${{ success() && matrix.bit == 'x86_64' }}
+        if: ${{ success() && matrix.bit == 'x86_64_v3' }}
         with:
           path: src_packages
           key: ${{ secrets.CACHE_VERSION }}-repository-${{ github.run_id }}
@@ -193,7 +193,7 @@ jobs:
           key: ${{ secrets.CACHE_VERSION }}-release_${{ matrix.bit }}-${{ github.run_id }}
 
       - name: Delete previous repository cache
-        if: ${{ always() && matrix.bit == 'x86_64' }}
+        if: ${{ always() && matrix.bit == 'x86_64_v3' }}
         env:
           GH_TOKEN: ${{ github.token }}
           CURL_RETRIES: "--connect-timeout 60 --retry 999 --retry-delay 5 --retry-all-errors"
