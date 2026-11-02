@@ -33,8 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 只保留 x86_64_v3（AVX2），减少构建时间与缓存体积
-        bit: [x86_64_v3]
+        bit: [i686, x86_64, x86_64_v3, aarch64]
     env:
       BIT: ${{ matrix.bit }}
     container:
@@ -181,7 +180,7 @@ jobs:
 
       - name: Saving repository cache
         uses: actions/cache/save@main
-        if: ${{ success() && matrix.bit == 'x86_64_v3' }}
+        if: ${{ success() && matrix.bit == 'x86_64' }}
         with:
           path: src_packages
           key: ${{ secrets.CACHE_VERSION }}-repository-${{ github.run_id }}
@@ -193,7 +192,7 @@ jobs:
           key: ${{ secrets.CACHE_VERSION }}-release_${{ matrix.bit }}-${{ github.run_id }}
 
       - name: Delete previous repository cache
-        if: ${{ always() && matrix.bit == 'x86_64_v3' }}
+        if: ${{ always() && matrix.bit == 'x86_64' }}
         env:
           GH_TOKEN: ${{ github.token }}
           CURL_RETRIES: "--connect-timeout 60 --retry 999 --retry-delay 5 --retry-all-errors"
@@ -214,7 +213,10 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       CURL_RETRIES: "--connect-timeout 60 --retry 999 --retry-delay 5 --retry-all-errors"
+      release_i686_key: ${{ secrets.CACHE_VERSION }}-release_i686-${{ github.run_id }}
+      release_x86_64_key: ${{ secrets.CACHE_VERSION }}-release_x86_64-${{ github.run_id }}
       release_x86_64_v3_key: ${{ secrets.CACHE_VERSION }}-release_x86_64_v3-${{ github.run_id }}
+      release_aarch64_key: ${{ secrets.CACHE_VERSION }}-release_aarch64-${{ github.run_id }}
     container:
       image: docker://alpine:latest
 
@@ -229,16 +231,34 @@ jobs:
 
       - uses: actions/checkout@main
 
+      - name: Loading release_i686 cache
+        uses: actions/cache/restore@main
+        with:
+          path: release_i686
+          key: ${{ env.release_i686_key }}
+
+      - name: Loading release_x86_64 cache
+        uses: actions/cache/restore@main
+        with:
+          path: release_x86_64
+          key: ${{ env.release_x86_64_key }}
+
       - name: Loading release_x86_64_v3 cache
         uses: actions/cache/restore@main
         with:
           path: release_x86_64_v3
           key: ${{ env.release_x86_64_v3_key }}
 
+      - name: Loading release_aarch64 cache
+        uses: actions/cache/restore@main
+        with:
+          path: release_aarch64
+          key: ${{ env.release_aarch64_key }}
+
       - name: Moving archives
         run: |
           mkdir -p release
-          mv release_x86_64_v3/* release
+          mv release_i686/* release_x86_64/* release_x86_64_v3/* release_aarch64/* release
           du -ah release/*
 
       - name: Uploading packages to Github release
