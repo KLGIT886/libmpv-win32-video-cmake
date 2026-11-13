@@ -44,7 +44,6 @@ if(TARGET_CPU STREQUAL "x86_64")
     set(xxhash_cflags "-DXXH_X86DISPATCH_ALLOW_AVX=1")
     set(nvcodec_headers "nvcodec-headers")
     set(ffmpeg_cuda "--enable-cuda-llvm --enable-cuvid --enable-nvdec --enable-nvenc --enable-ffnvcodec")
-    set(ffmpeg_uavs3d "--enable-libuavs3d --enable-decoder=libuavs3d")
 elseif(TARGET_CPU STREQUAL "i686")
     set(dlltool_image "i386")
     set(vulkan_asm "-DUSE_MASM=OFF")
@@ -55,8 +54,6 @@ elseif(TARGET_CPU STREQUAL "i686")
     set(xxhash_cflags "-DXXH_X86DISPATCH_ALLOW_AVX=1")
     set(nvcodec_headers "nvcodec-headers")
     set(ffmpeg_cuda "--enable-cuda-llvm --enable-cuvid --enable-nvdec --enable-nvenc --enable-ffnvcodec")
-    # i686 已验证可编译 uavs3d（走 x86 SSE/AVX2 实现）
-    set(ffmpeg_uavs3d "--enable-libuavs3d --enable-decoder=libuavs3d")
 elseif(TARGET_CPU STREQUAL "aarch64")
     set(dlltool_image "arm64")
     set(vulkan_asm "-DUSE_GAS=ON")
@@ -64,7 +61,14 @@ elseif(TARGET_CPU STREQUAL "aarch64")
     set(openssl_ec_opt "enable-ec_nistp_64_gcc_128")
     set(libvpx_target "arm64-win64-gcc")
     set(mpv_gl "-Dgl=disabled -Degl-angle=disabled")
-    # uavs3d 的 decore/arm64/*.S 用 clang 集成汇编器会报 "expected absolute
-    # expression"（宏内非绝对表达式），交叉编译直接失败；aarch64 不启用 AVS3 解码。
+endif()
+
+# uavs3d（AVS3 解码）：x86/x86_64 走 SSE/AVX2 实现，aarch64 走 decore/arm64 汇编。
+# aarch64 的 .S 交 clang COFF 汇编器时，.type 指令会被当成 .def 内的数值类型并报
+# "expected absolute expression"，已用 packages/uavs3d-0001-skip-elf-type-directive-on-coff.patch
+# 在 _WIN32 下略去该指令。
+if(TARGET_CPU MATCHES "x86_64|i686|aarch64")
+    set(ffmpeg_uavs3d "--enable-libuavs3d --enable-decoder=libuavs3d")
+else()
     set(ffmpeg_uavs3d "--disable-libuavs3d")
 endif()

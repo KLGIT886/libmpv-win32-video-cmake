@@ -1,0 +1,15 @@
+diff --git a/source/decore/arm64/def_arm64.S b/source/decore/arm64/def_arm64.S
+--- a/source/decore/arm64/def_arm64.S
++++ b/source/decore/arm64/def_arm64.S
+@@ -44,9 +44,11 @@
+ #else
+ .macro function name
+     .text
+     .align 4
+     .global \name
++#ifndef _WIN32
+     .type   \name, %function
++#endif
+     \name:
+ .endm
+ #endif
