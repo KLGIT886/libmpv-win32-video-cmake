@@ -2,6 +2,9 @@ ExternalProject_Add(uavs3d
     GIT_REPOSITORY https://github.com/uavs3/uavs3d.git
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--filter=tree:0"
+    # 钉死提交：补丁依赖 def_arm64.S 的上下文；同时让 force_rebuild_git 走
+    # 「删除 stamp」分支，保证被 git reset 掉的工作区补丁每次都会重新应用
+    GIT_TAG 0e20d2c291853f196c68922a264bcd8471d75b68
     UPDATE_COMMAND ""
     # aarch64 目标为 COFF：clang 的 COFF 汇编器把 .type 解析成 .def 块内的
     # 数值类型（"expected absolute expression"），故给 def_arm64.S 打补丁在
