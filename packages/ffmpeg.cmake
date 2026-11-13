@@ -75,7 +75,8 @@ ExternalProject_Add(ffmpeg
         --disable-bzlib
         --disable-libmfx
         # uavs3d：AVS3 解码（8K 直播必需），COMPILE_10BIT=ON 见 packages/uavs3d.cmake
-        --enable-libuavs3d
+        # 仅 x86/x86_64 可用；aarch64 由 packages_check.cmake 置为 --disable-libuavs3d
+        ${ffmpeg_uavs3d}
         --disable-linux-perf
         --disable-videotoolbox
         --disable-audiotoolbox
@@ -133,8 +134,7 @@ ExternalProject_Add(ffmpeg
         --enable-decoder=hevc*
         --enable-decoder=av1*
         --enable-decoder=libdav1d
-        # AVS3（8K/AVS3-P2 10bit）解码，由 uavs3d 提供
-        --enable-decoder=libuavs3d
+        # AVS3（8K/AVS3-P2 10bit）解码器随 ${ffmpeg_uavs3d} 一起开启（x86/x86_64）
         --enable-decoder=theora
         --enable-decoder=msmpeg*
         --enable-decoder=mjpeg*
