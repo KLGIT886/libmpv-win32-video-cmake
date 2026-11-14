@@ -1,0 +1,119 @@
+diff --git a/libavfilter/aarch64/vf_bwdif_neon.S b/libavfilter/aarch64/vf_bwdif_neon.S
+index d078f6f..c432ef1 100644
+--- a/libavfilter/aarch64/vf_bwdif_neon.S
++++ b/libavfilter/aarch64/vf_bwdif_neon.S
+@@ -94,10 +94,11 @@
+         umax            \t0\().16b, \t0\().16b, \t1\().16b
+         umin            \t2\().16b, \t2\().16b, \t0\().16b
+ 
+-        cmeq            \t1\().16b, \diff\().16b, #0
++        movi            \t1\().16b, #10
++        cmhi            \t1\().16b, \diff\().16b, \t1\().16b
+         umax            \diff\().16b, \diff\().16b, \t3\().16b
+         umax            \diff\().16b, \diff\().16b, \t2\().16b
+-        bic             \diff\().16b, \diff\().16b, \t1\().16b
++        and             \diff\().16b, \diff\().16b, \t1\().16b
+ .endm
+ 
+ //      i0 = s0;
+diff --git a/libavfilter/bwdifdsp.c b/libavfilter/bwdifdsp.c
+index 58e18f0..91e8435 100644
+--- a/libavfilter/bwdifdsp.c
++++ b/libavfilter/bwdifdsp.c
+@@ -48,6 +48,15 @@ static const uint16_t coef_lf[2] = { 4309, 213 };
+ static const uint16_t coef_hf[3] = { 5570, 3801, 1016 };
+ static const uint16_t coef_sp[2] = { 5077, 981 };
+ 
++/*
++ * Weave gate tolerance, in 8-bit code units scaled by the sample depth.
++ * The reference gate is "diff == 0", so any per-frame encoder ringing on
++ * static high-frequency detail (a channel logo, for instance) is treated as
++ * motion and re-interpolated spatially, which flickers at field rate.
++ * Treating small differences as still makes such detail weave both fields
++ * again. 10 codes matches rtp2httpd's hand-written bwdif shader.
++ */
++#define BWDIF_WEAVE_TOL(clip_max) (10 * (((clip_max) + 1) >> 8))
+ 
+ #define FILTER_INTRA() \
+     for (x = 0; x < w; x++) { \
+@@ -68,7 +77,7 @@ static const uint16_t coef_sp[2] = { 5077, 981 };
+         int temporal_diff2 =(FFABS(next[mrefs] - c) + FFABS(next[prefs] - e)) >> 1; \
+         int diff = FFMAX3(temporal_diff0 >> 1, temporal_diff1, temporal_diff2); \
+  \
+-        if (!diff) { \
++        if (diff <= BWDIF_WEAVE_TOL(clip_max)) { \
+             dst[0] = d; \
+         } else {
+ 
+diff --git a/libavfilter/x86/vf_bwdif.asm b/libavfilter/x86/vf_bwdif.asm
+index bc1d164..5dcac1a 100644
+--- a/libavfilter/x86/vf_bwdif.asm
++++ b/libavfilter/x86/vf_bwdif.asm
+@@ -32,6 +32,9 @@ pw_coefhf:  times 16 dw  1016, 5570
+ pw_coefhf1: times 32 dw -3801
+ pw_coefsp:  times 16 dw  5077, -981
+ pw_splfdif: times 16 dw  -768,  768
++; Weave gate tolerance (8-bit code units): diffs at or below this weave.
++pw_weave_tol8:  times 32 dw   10
++pw_weave_tol12: times 32 dw   40
+ 
+ SECTION .text
+ 
+@@ -67,7 +70,7 @@ SECTION .text
+     movu     [dstq], m2
+ %endmacro
+ 
+-%macro FILTER 5
++%macro FILTER 6
+     pxor         m7, m7
+ .loop%1:
+     LOAD%4       m0, [curq+t0*%5]
+@@ -97,6 +100,8 @@ SECTION .text
+     paddw        m3, m4
+     psrlw        m3, 1
+     pmaxsw       m2, m3
++    psubw        m2, [%6]
++    pmaxsw       m2, m7
+ 
+     LOAD%4       m3, [%2+t0*2*%5]
+     LOAD%4       m4, [%3+t0*2*%5]
+@@ -223,7 +228,7 @@ SECTION .text
+     jg .loop%1
+ %endmacro
+ 
+-%macro PROC 2
++%macro PROC 3
+ %if ARCH_X86_64
+     movsxd       r5, DWORD prefsm
+     movsxd       r6, DWORD mrefsm
+@@ -241,10 +246,10 @@ SECTION .text
+ %endif
+     cmp DWORD paritym, 0
+     je .parity0
+-    FILTER 1, prevq, curq, %1, %2
++    FILTER 1, prevq, curq, %1, %2, %3
+     jmp .ret
+ .parity0:
+-    FILTER 0, curq, nextq, %1, %2
++    FILTER 0, curq, nextq, %1, %2, %3
+ .ret:
+     RET
+ %endmacro
+@@ -260,7 +265,7 @@ cglobal bwdif_filter_line, 4, 6, 8, 64, dst, prev, cur, next, w, prefs, \
+                                         prefs4, mrefs4, parity, clip_max
+ %endif
+     %define STEP mmsize/2
+-    PROC 8, 1
++    PROC 8, 1, pw_weave_tol8
+ 
+ %if ARCH_X86_64
+ cglobal bwdif_filter_line_12bit, 4, 9, 13, 0, dst, prev, cur, next, w, \
+@@ -284,7 +289,7 @@ cglobal bwdif_filter_line_12bit, 4, 6, 8, 80, dst, prev, cur, next, w, \
+     mova        m12, m0
+ %endif
+     %define STEP mmsize
+-    PROC 12, 2
++    PROC 12, 2, pw_weave_tol12
+ %endmacro
+ 
+ INIT_XMM ssse3
